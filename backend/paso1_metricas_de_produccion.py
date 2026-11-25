@@ -43,9 +43,8 @@ AGENTE = os.getenv("LANGSMITH_AGENT_ID", "asistente-del-curso")
 ENTORNO = "production"
 DIAS = 7
 
-# Los modelos de NVIDIA del plan gratuito no cobran, y LangSmith muestra
-# costo 0. Para practicar el cálculo usamos un precio de referencia, en
-# dólares por millón de tokens. Cambialo por el de tu proveedor real.
+# Precio de referencia, en dólares por millón de tokens. Revisá el precio
+# actual de Claude Sonnet en anthropic.com/pricing y cambialo acá.
 PRECIO_ENTRADA = 0.10
 PRECIO_SALIDA = 0.40
 

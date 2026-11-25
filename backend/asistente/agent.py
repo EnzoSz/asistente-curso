@@ -37,14 +37,19 @@ from asistente.utils.tools import HERRAMIENTAS
 
 load_dotenv()
 
-if not os.getenv("NVIDIA_API_KEY"):
-    print("Falta NVIDIA_API_KEY. Corré: uv run paso0_verificar_entorno.py")
-    sys.exit(1)
+# Gemini hace los embeddings del RAG (documentos.py); Anthropic es el
+# modelo que contesta.
+for clave in ("GOOGLE_API_KEY", "ANTHROPIC_API_KEY"):
+    if not os.getenv(clave):
+        print(f"Falta {clave} en el .env")
+        sys.exit(1)
 
-# Los modelos de NVIDIA. Si el paso 0 te avisa que alguno no está
-# disponible, cambialo acá: es el único lugar donde aparecen.
-MODELO = "nvidia/nemotron-3.5-lightning-30b-a3b"
-MODELO_RESPALDO = "nvidia/nemotron-3-super-120b-a12b"  # el plan B de la v2
+# El modelo que contesta: Claude Sonnet 5.5. Es el único lugar donde
+# aparece: la API, las evaluaciones y los pasos lo importan.
+MODELO = "claude-sonnet-5-5"
+PROVEEDOR = "anthropic"
+# El plan B de la v2, en OTRO proveedor: si Anthropic se cae, contesta Gemini.
+MODELO_RESPALDO = "google_genai:gemini-3.8-flash"
 
 
 # --- Versión 1: la que está en producción desde la clase 1 ------------
@@ -87,11 +92,11 @@ BARANDAS = [
     # Costo y bucles: como máximo 5 llamadas al modelo por pregunta. Si
     # se pasa, termina con un aviso en vez de una excepción.
     ModelCallLimitMiddleware(run_limit=5, exit_behavior="end"),
-    # APIs inestables (como el 503 de NVIDIA): si una herramienta falla,
+    # APIs inestables (como un 503 de Gemini): si una herramienta falla,
     # reintenta dos veces. Si sigue fallando, le avisa al modelo.
     ToolRetryMiddleware(max_retries=2, initial_delay=0.5, on_failure="continue"),
     # Caídas del proveedor: si el modelo principal falla, usa este.
-    ModelFallbackMiddleware(f"nvidia:{MODELO_RESPALDO}"),
+    ModelFallbackMiddleware(MODELO_RESPALDO),
 ]
 
 
@@ -99,14 +104,14 @@ def armar_agente(version: str = "v1", checkpointer=None):
     """Arma la versión pedida del agente ("v1" o "v2")."""
     if version == "v2":
         return create_agent(
-            f"nvidia:{MODELO}",
+            f"{PROVEEDOR}:{MODELO}",
             tools=HERRAMIENTAS,
             system_prompt=INSTRUCCIONES_V2,
             middleware=BARANDAS,
             checkpointer=checkpointer,
         )
     return create_agent(
-        f"nvidia:{MODELO}",
+        f"{PROVEEDOR}:{MODELO}",
         tools=HERRAMIENTAS,
         system_prompt=INSTRUCCIONES,
         checkpointer=checkpointer,

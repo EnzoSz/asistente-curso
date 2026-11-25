@@ -1,8 +1,8 @@
 """La base vectorial con los documentos del curso, guardada en SQLite.
 
 La primera vez que arranca, parte los documentos en fragmentos, le pide a
-NVIDIA un embedding por fragmento y los guarda en documentos.db. Las veces
-siguientes los lee del archivo: NVIDIA solo recibe los fragmentos nuevos o
+Gemini un embedding por fragmento y los guarda en documentos.db. Las veces
+siguientes los lee del archivo: Gemini solo recibe los fragmentos nuevos o
 que cambiaron. Así, reiniciar el servidor no gasta llamadas de embeddings.
 
 Usa SqliteStore, el almacén de LangGraph (el mismo paquete que guarda la
@@ -12,16 +12,16 @@ memoria de las conversaciones), con búsqueda semántica activada.
 import hashlib
 import os
 import sqlite3
-import warnings
+import time
 
 from dotenv import load_dotenv
-from langchain_nvidia_ai_endpoints import NVIDIAEmbeddings
+from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langgraph.store.base import PutOp
 from langgraph.store.sqlite import SqliteStore
 
-MODELO_EMBEDDINGS = "nvidia/nemotron-3.5-embed-1b"
-DIMENSIONES = 2048  # el tamaño del vector que devuelve ese modelo
+MODELO_EMBEDDINGS = "gemini-embedding-2"
+DIMENSIONES = 768  # pedimos vectores de 768 (el modelo da hasta 3072)
 ESPACIO = ("documentos",)  # la "carpeta" del almacén donde van los fragmentos
 
 # backend/asistente/utils/documentos.py  ->  backend/documentos/
@@ -30,14 +30,51 @@ AQUI = os.path.dirname(os.path.abspath(__file__))
 CARPETA = os.path.join(AQUI, "..", "..", "documentos")
 ARCHIVO_DB = os.path.join(AQUI, "..", "..", "documentos.db")
 
-# Nemotron 3.5 Embed es tan nuevo que el conector todavía avisa que
-# "puede fallar". Funciona igual: callamos ese aviso.
-warnings.filterwarnings("ignore", message=".*inference may fail")
+# gemini-embedding-2 busca mejor si el texto lleva un prefijo que dice qué
+# es: un documento o una pregunta. SqliteStore usa la misma función para
+# los dos casos, así que el prefijo lo ponemos nosotros: acá para los
+# fragmentos y en tools.py (con prefijo_pregunta) para las búsquedas.
+def prefijo_documento(fuente: str, texto: str) -> str:
+    return f"title: {fuente} | text: {texto}"
+
+
+def prefijo_pregunta(consulta: str) -> str:
+    return f"task: search result | query: {consulta}"
+
 
 # Leemos el .env acá mismo: este archivo se importa antes que el resto del
-# agente, y los embeddings necesitan NVIDIA_API_KEY desde el primer momento.
+# agente, y los embeddings necesitan GOOGLE_API_KEY desde el primer momento.
 load_dotenv()
-embeddings = NVIDIAEmbeddings(model=MODELO_EMBEDDINGS, truncate="END")
+
+# El plan gratuito de Gemini tiene límite de pedidos por minuto (429) y a
+# veces el servicio está saturado (503). Son errores pasajeros: esperamos
+# un poco y reintentamos, en vez de tumbar toda la respuesta del agente.
+ERRORES_PASAJEROS = ("429", "500", "503", "RESOURCE_EXHAUSTED", "UNAVAILABLE")
+INTENTOS = 4
+
+
+def con_reintentos(funcion, *args):
+    for intento in range(INTENTOS):
+        try:
+            return funcion(*args)
+        except Exception as error:
+            pasajero = any(codigo in str(error) for codigo in ERRORES_PASAJEROS)
+            if not pasajero or intento == INTENTOS - 1:
+                raise
+            time.sleep(2 ** (intento + 1))  # 2s, 4s, 8s
+
+
+class EmbeddingsConReintentos(GoogleGenerativeAIEmbeddings):
+    def embed_documents(self, texts, **kwargs):
+        return con_reintentos(super().embed_documents, texts)
+
+    def embed_query(self, text, **kwargs):
+        return con_reintentos(super().embed_query, text)
+
+
+embeddings = EmbeddingsConReintentos(
+    model=MODELO_EMBEDDINGS, output_dimensionality=DIMENSIONES
+)
 
 # check_same_thread=False: FastAPI atiende cada pedido en un hilo distinto.
 conexion = sqlite3.connect(
@@ -45,7 +82,8 @@ conexion = sqlite3.connect(
 )
 base = SqliteStore(
     conexion,
-    index={"dims": DIMENSIONES, "embed": embeddings, "fields": ["texto"]},
+    # Se indexa "indexado" (el texto con su prefijo); "texto" es lo que lee el agente.
+    index={"dims": DIMENSIONES, "embed": embeddings, "fields": ["indexado"]},
 )
 base.setup()  # crea las tablas si no existen
 
@@ -58,9 +96,13 @@ for nombre in sorted(os.listdir(CARPETA)):
         texto = archivo.read()
     for parte in partidor.split_text(texto):
         clave = hashlib.sha256(f"{nombre}|{parte}".encode()).hexdigest()[:16]
-        fragmentos[clave] = {"texto": parte, "fuente": nombre}
+        fragmentos[clave] = {
+            "texto": parte,
+            "fuente": nombre,
+            "indexado": prefijo_documento(nombre, parte),
+        }
 
-# 2. Ver qué hay guardado (leer no llama a NVIDIA: no hay consulta).
+# 2. Ver qué hay guardado (leer no llama a Gemini: no hay consulta).
 guardados = {item.key for item in base.search(ESPACIO, limit=10_000)}
 
 # 3. Guardar solo lo nuevo, en un solo pedido de embeddings, y borrar lo que

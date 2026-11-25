@@ -2,7 +2,7 @@
 
 Qué demuestra: un diagnóstico del entorno de trabajo. Comprueba la versión
 de Python, que las librerías estén instaladas, que exista el .env con las
-dos claves (NVIDIA y LangSmith) y la configuración de las trazas, que
+claves (Anthropic, Google y LangSmith) y la configuración de las trazas, que
 esté git (para subir el proyecto a GitHub), y hace una llamada de prueba a
 cada servicio, incluido el modelo de respaldo de la v2.
 
@@ -49,7 +49,8 @@ librerias = [
     ("langgraph-checkpoint-sqlite", "langgraph.checkpoint.sqlite"),
     ("langchain", "langchain"),
     ("langchain-core", "langchain_core"),
-    ("langchain-nvidia-ai-endpoints", "langchain_nvidia_ai_endpoints"),
+    ("langchain-anthropic", "langchain_anthropic"),
+    ("langchain-google-genai", "langchain_google_genai"),
     ("langchain-text-splitters", "langchain_text_splitters"),
     ("langgraph", "langgraph"),
     ("langsmith", "langsmith"),
@@ -126,16 +127,21 @@ except Exception:
 
 # Por seguridad mostramos solo los últimos 4 caracteres de cada clave:
 # así podés pegar esta salida en el chat del curso sin revelarlas.
-clave = os.getenv("NVIDIA_API_KEY", "").strip()
-if clave.startswith("nvapi-"):
-    print(f"[OK]    NVIDIA_API_KEY cargada, termina en ...{clave[-4:]}")
-    resumen.append("[OK]    NVIDIA_API_KEY")
-elif clave:
-    print("[FALTA] NVIDIA_API_KEY no empieza con 'nvapi-': revisá que sea la de NVIDIA")
-    resumen.append("[FALTA] NVIDIA_API_KEY")
+clave = os.getenv("ANTHROPIC_API_KEY", "").strip()
+if clave.startswith("sk-ant-"):
+    print(f"[OK]    ANTHROPIC_API_KEY cargada, termina en ...{clave[-4:]}")
+    resumen.append("[OK]    ANTHROPIC_API_KEY")
 else:
-    print("[FALTA] NVIDIA_API_KEY: copiala del .env de la clase 2")
-    resumen.append("[FALTA] NVIDIA_API_KEY")
+    print("[FALTA] ANTHROPIC_API_KEY: falta, o no empieza con 'sk-ant-'")
+    resumen.append("[FALTA] ANTHROPIC_API_KEY")
+
+clave_google = os.getenv("GOOGLE_API_KEY", "").strip()
+if clave_google:
+    print(f"[OK]    GOOGLE_API_KEY cargada, termina en ...{clave_google[-4:]}")
+    resumen.append("[OK]    GOOGLE_API_KEY")
+else:
+    print("[FALTA] GOOGLE_API_KEY: creala en aistudio.google.com")
+    resumen.append("[FALTA] GOOGLE_API_KEY")
 
 clave_ls = os.getenv("LANGSMITH_API_KEY", "").strip()
 if clave_ls.startswith("lsv2_"):
@@ -197,93 +203,34 @@ else:
     resumen.append("[FALTA] VERSION_AGENTE")
 
 
-# --- 6. Una llamada de prueba a NVIDIA -----------------------------
-# Llamadas HTTP normales, sin LangChain: separan un problema de clave o
-# de red de uno del código. Primero el modelo de chat, después el de
-# embeddings.
-MODELO = "nvidia/nemotron-3.5-lightning-30b-a3b"
-MODELO_EMBEDDINGS = "nvidia/nemotron-3.5-embed-1b"
-# El modelo de respaldo de la v2 (ModelFallbackMiddleware).
-MODELO_RESPALDO = "nvidia/nemotron-3-super-120b-a12b"
-URL_NVIDIA = "https://integrate.api.nvidia.com/v1"
-
-if not clave:
-    print("[FALTA] modelos de NVIDIA: se omiten, no hay clave para probar")
-    resumen.append("[FALTA] modelos de NVIDIA")
-else:
+# --- 6. Una llamada de prueba a cada modelo -----------------------
+# Los mismos de asistente/agent.py y asistente/utils/documentos.py.
+MODELOS_DE_CHAT = [
+    ("anthropic:claude-sonnet-5-5", "el que contesta"),
+    ("google_genai:gemini-3.8-flash", "el respaldo de la v2"),
+]
+for modelo, papel in MODELOS_DE_CHAT:
     try:
-        import requests
+        from langchain.chat_models import init_chat_model
 
-        r = requests.post(
-            f"{URL_NVIDIA}/chat/completions",
-            headers={"Authorization": f"Bearer {clave}"},
-            json={
-                "model": MODELO,
-                "messages": [{"role": "user", "content": "Decí hola."}],
-                "max_tokens": 5,
-            },
-            timeout=60,
-        )
-        if r.status_code == 200:
-            print(f"[OK]    {MODELO} respondió")
-            resumen.append("[OK]    modelo de chat")
-        elif r.status_code in (401, 403):
-            print(f"[FALTA] clave de NVIDIA inválida o sin permisos ({r.status_code})")
-            resumen.append("[FALTA] modelo de chat")
-        elif r.status_code == 404:
-            print(f"[FALTA] el modelo {MODELO} no está disponible (404)")
-            print("        Cambiá MODELO en asistente/agent.py por otro Nemotron del catálogo")
-            resumen.append("[FALTA] modelo de chat")
-        elif r.status_code == 429:
-            print("[FALTA] límite de consultas por ahora (429). Esperá un minuto")
-            resumen.append("[FALTA] modelo de chat")
-        else:
-            print(f"[FALTA] respuesta inesperada de NVIDIA ({r.status_code})")
-            resumen.append("[FALTA] modelo de chat")
-
-        r = requests.post(
-            f"{URL_NVIDIA}/chat/completions",
-            headers={"Authorization": f"Bearer {clave}"},
-            json={
-                "model": MODELO_RESPALDO,
-                "messages": [{"role": "user", "content": "Decí hola."}],
-                "max_tokens": 5,
-            },
-            timeout=60,
-        )
-        if r.status_code == 200:
-            print(f"[OK]    {MODELO_RESPALDO} respondió (el respaldo)")
-            resumen.append("[OK]    modelo de respaldo")
-        else:
-            print(f"[FALTA] el respaldo {MODELO_RESPALDO} respondió {r.status_code}")
-            print("        Cambiá MODELO_RESPALDO en asistente/agent.py")
-            resumen.append("[FALTA] modelo de respaldo")
-
-        r = requests.post(
-            f"{URL_NVIDIA}/embeddings",
-            headers={"Authorization": f"Bearer {clave}"},
-            json={
-                "model": MODELO_EMBEDDINGS,
-                "input": ["hola"],
-                "input_type": "query",
-                "truncate": "END",
-            },
-            timeout=60,
-        )
-        if r.status_code == 200:
-            print(f"[OK]    {MODELO_EMBEDDINGS} respondió")
-            resumen.append("[OK]    modelo de embeddings")
-        elif r.status_code == 404:
-            print(f"[FALTA] el modelo {MODELO_EMBEDDINGS} no está disponible (404)")
-            print("        Probá con nvidia/llama-nemotron-embed-1b-v2 en asistente/utils/documentos.py")
-            resumen.append("[FALTA] modelo de embeddings")
-        else:
-            print(f"[FALTA] embeddings: NVIDIA respondió {r.status_code}")
-            resumen.append("[FALTA] modelo de embeddings")
+        init_chat_model(modelo).invoke("Decí hola.")
+        print(f"[OK]    {modelo} respondió ({papel})")
+        resumen.append(f"[OK]    {modelo}")
     except Exception as error:
-        print(f"[FALTA] NVIDIA: no hubo conexión ({type(error).__name__}).")
-        print("        Revisá internet, VPN o proxy corporativo")
-        resumen.append("[FALTA] modelos de NVIDIA")
+        print(f"[FALTA] {modelo} ({papel}): {type(error).__name__}: {str(error)[:120]}")
+        resumen.append(f"[FALTA] {modelo}")
+
+try:
+    from langchain_google_genai import GoogleGenerativeAIEmbeddings
+
+    vector = GoogleGenerativeAIEmbeddings(
+        model="gemini-embedding-2", output_dimensionality=768
+    ).embed_query("hola")
+    print(f"[OK]    gemini-embedding-2 respondió ({len(vector)} dimensiones)")
+    resumen.append("[OK]    modelo de embeddings")
+except Exception as error:
+    print(f"[FALTA] gemini-embedding-2: {type(error).__name__}: {str(error)[:120]}")
+    resumen.append("[FALTA] modelo de embeddings")
 
 
 # --- 7. Una llamada de prueba a LangSmith --------------------------

@@ -25,7 +25,7 @@ from langchain.agents.middleware import ModelCallLimitMiddleware
 from langchain.tools import tool
 from langchain_core.tracers.langchain import wait_for_all_tracers
 
-from asistente.agent import BARANDAS, MODELO, agente_v2
+from asistente.agent import BARANDAS, MODELO, PROVEEDOR, agente_v2
 from asistente.utils.tools import buscar_fecha
 
 # El mismo tiempo máximo de la clase 2: ninguna API contesta tan rápido.
@@ -61,7 +61,7 @@ print()
 # --- Baranda 2: una API caída -----------------------------------------
 # El mismo agente con feriados de la clase 2, ahora con las barandas.
 agente_con_feriados = create_agent(
-    f"nvidia:{MODELO}",
+    f"{PROVEEDOR}:{MODELO}",
     tools=[buscar_fecha, consultar_feriados],
     system_prompt="Sos el asistente del curso. Contestá en dos líneas.",
     middleware=BARANDAS,
@@ -81,7 +81,7 @@ print()
 # Un tope de 1 a propósito: no le alcanza para usar una herramienta y
 # después contestar. En la clase 2 esto era un GraphRecursionError.
 agente_con_tope = create_agent(
-    f"nvidia:{MODELO}",
+    f"{PROVEEDOR}:{MODELO}",
     tools=[buscar_fecha],
     middleware=[ModelCallLimitMiddleware(run_limit=1, exit_behavior="end")],
 )

@@ -8,7 +8,7 @@ from datetime import date
 
 from langchain.tools import tool
 
-from asistente.utils.documentos import ESPACIO, base
+from asistente.utils.documentos import ESPACIO, base, prefijo_pregunta
 
 # El calendario del Módulo 3. Son fechas de ejemplo: cambialas por las de
 # tu cohorte para que las respuestas tengan sentido.
@@ -63,7 +63,7 @@ def buscar_en_documentos(consulta: str) -> str:
     cada uno con el nombre del archivo de donde salió. Usala para
     cualquier duda sobre contenidos, evaluación o funcionamiento del curso.
     """
-    resultados = base.search(ESPACIO, query=consulta, limit=3)
+    resultados = base.search(ESPACIO, query=prefijo_pregunta(consulta), limit=3)
 
     bloques = []
     for fragmento in resultados:
