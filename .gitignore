@@ -1,0 +1,23 @@
+# Secretos: jamás subir las claves (en ninguna carpeta)
+.env
+.env.*
+!.env.example
+
+# Entornos virtuales y Python creados por uv
+.venv/
+.uv-python/
+
+# Caché de Python y del servidor local de LangGraph
+__pycache__/
+*.py[cod]
+*.egg-info/
+.langgraph_api/
+
+# La memoria de las conversaciones (datos de alumnos). documentos.db sí se sube.
+memoria.db*
+documentos.db-*
+
+# Editores y sistema operativo
+.vscode/
+.idea/
+.DS_Store

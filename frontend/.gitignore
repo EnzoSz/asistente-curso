@@ -1,0 +1,16 @@
+# Secretos: jamás subir las claves
+.env
+
+# Entorno virtual creado por uv
+.venv/
+
+# Caché de Python y del servidor local de LangGraph
+__pycache__/
+*.py[cod]
+*.egg-info/
+.langgraph_api/
+
+# Editores y sistema operativo
+.vscode/
+.idea/
+.DS_Store

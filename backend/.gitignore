@@ -1,0 +1,22 @@
+# Secretos: jamás subir las claves
+.env
+
+# Entorno virtual y Python creados por uv
+.venv/
+.uv-python/
+
+# Caché de Python y del servidor local de LangGraph
+__pycache__/
+*.py[cod]
+*.egg-info/
+.langgraph_api/
+
+# Editores y sistema operativo
+.vscode/
+.idea/
+.DS_Store
+
+# La memoria de las conversaciones de la API (datos de alumnos)
+memoria.db*
+# documentos.db (la base vectorial) se puede subir: no tiene datos personales
+documentos.db-*

@@ -1,0 +1,8 @@
+# Configuración de Streamlit para la clase.
+[server]
+# No abre el navegador solo ni pide un correo la primera vez.
+# Abrí vos http://localhost:8501
+headless = true
+
+[browser]
+gatherUsageStats = false
