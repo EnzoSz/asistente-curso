@@ -101,7 +101,7 @@ En render.com: **New > Web Service** > conectá GitHub > elegí tu repositorio.
 | Language | Python 3 |
 | Branch | `main` |
 | Root Directory | `backend` |
-| Build Command | `UV_PYTHON_INSTALL_DIR=.uv-python uv sync --frozen --no-dev --managed-python` |
+| Build Command | `UV_PYTHON_DOWNLOADS=automatic UV_PYTHON_INSTALL_DIR=.uv-python uv sync --frozen --no-dev --managed-python` |
 | Start Command | `uv run --no-sync fastapi run api/main.py --port $PORT` |
 | Instance Type | **Free** |
 
@@ -128,8 +128,10 @@ Probala:
 
 **Por qué el Build Command es largo:** Render trae su propio Python. Con
 `--managed-python` usamos el de uv, el mismo de la clase, que sabe cargar la
-extensión de SQLite de `documentos.db`; `UV_PYTHON_INSTALL_DIR` lo guarda dentro
-de la carpeta del proyecto, para que siga ahí cuando el servicio arranca.
+extensión de SQLite de `documentos.db`; `UV_PYTHON_DOWNLOADS=automatic` le
+permite a uv descargarlo (Render lo tiene bloqueado por defecto), y
+`UV_PYTHON_INSTALL_DIR` lo guarda dentro de la carpeta del proyecto, para que
+siga ahí cuando el servicio arranca.
 
 ---
 
@@ -233,6 +235,7 @@ En Studio podés elegir `asistente` o `asistente_v2`.
 | Render: `No module named 'api'` | El Root Directory no es `backend` | Settings > Root Directory: `backend` |
 | Render: `Port scan timeout` | El Start Command no usa `$PORT` | Copiá el Start Command de la tabla |
 | Render: `no such module: vec0` o `enable_load_extension` | Render usó su Python | Copiá el Build Command completo, con `--managed-python` |
+| Render: `No interpreter found for Python 3.12 in managed installations` | Render no deja que uv descargue Python | El Build Command tiene que empezar con `UV_PYTHON_DOWNLOADS=automatic` |
 | Streamlit: `ConnectionError` | `URL_BACKEND` mal escrita, o Render dormido | Revisá los Secrets; abrí `/salud` del backend y esperá un minuto |
 | Streamlit: `401` | La `CLAVE_API` del front no es la de Render | Que sean iguales, letra por letra |
 | `No hay ejecuciones` en el paso 1 | Nadie usó la web desplegada todavía | Hacé preguntas en tu URL de Streamlit, o cambiá `ENTORNO` |

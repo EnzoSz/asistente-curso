@@ -49,7 +49,7 @@ for clave in ("GOOGLE_API_KEY", "ANTHROPIC_API_KEY"):
 MODELO = "claude-sonnet-5-5"
 PROVEEDOR = "anthropic"
 # El plan B de la v2, en OTRO proveedor: si Anthropic se cae, contesta Gemini.
-MODELO_RESPALDO = "google_genai:gemini-3.8-flash"
+MODELO_RESPALDO = "google_genai:gemini-3.5-flash"
 
 
 # --- Versión 1: la que está en producción desde la clase 1 ------------

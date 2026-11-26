@@ -58,11 +58,11 @@ async def main():
     ejecuciones = []
     async for run in cliente.runs.query(
         project_ids=[destino.session_id],
-        is_root=True,
+        is_root=True, # Solo las ejecuciones raíz (no las subherramientas)
         min_start_time=desde,
         selects=["STATUS", "LATENCY_SECONDS", "PROMPT_TOKENS",
                  "COMPLETION_TOKENS", "FEEDBACK_STATS"],
-        include_subtree_usage=True,
+        include_subtree_usage=True, # Incluye el uso de subprocesos (herramientas) en las métricas
     ):
         ejecuciones.append(run)
 
@@ -85,9 +85,9 @@ async def main():
 
     # Percentiles: ordenamos las latencias y miramos la que está en la
     # mitad (p50) y la que está al 95 % de la lista (p95).
-    latencias.sort()
-    p50 = latencias[int(total * 0.50)]
-    p95 = latencias[min(int(total * 0.95), total - 1)]
+    latencias.sort() # Ordenamos las latencias para calcular percentiles
+    p50 = latencias[int(total * 0.50)] # Percentil 50 (mediana)
+    p95 = latencias[min(int(total * 0.95), total - 1)] # Percentil 95
 
     costo = tokens_entrada * PRECIO_ENTRADA + tokens_salida * PRECIO_SALIDA
     costo = costo / 1_000_000  # los precios son por millón de tokens
@@ -106,7 +106,7 @@ async def main():
         project_ids=[destino.session_id],
         run_type="TOOL",
         min_start_time=desde,
-        selects=["NAME"],
+        selects=["NAME"], # Solo necesitamos el nombre de la herramienta usada
     ):
         usos[run.name] = usos.get(run.name, 0) + 1
 
